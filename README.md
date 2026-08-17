@@ -182,20 +182,21 @@ on various issues, for syslog-ng to react accordingly).
 
 [disk-buffer()] in ["destination" block] will store messages that were not yet
 sent/acknowledged by RELP server, and RELPDestination.send() only returns SUCCESS code -
-meaning that message can be removed from that buffer - when it gets acknowledgement
-for that specific message.
+meaning that message can be removed from that buffer - when it gets an ack,
+otherwise RETRY on nak, or ERROR/NOT_CONNECTED for network issues.
 
-RELP messages are NOT batched or sent in parallel to each other, because
-syslog-ng destinations do not work asynchronously, so it's impossible to
-acknowledge or retry specific message(s) in a batch, at least with current syslog-ng
-(as of version 4.11.0, 2026-08-16).
+RELP messages are NOT batched or sent in parallel to each other (setting batch-\*
+options will do nothing), as implementation here is simple and synchronous.
 
-This can be a major bottleneck in high-traffic scenarios with high network
-latency, as fully sending each message requires full network round-trip,
-incl. time for message packet(s) to arrive to destination and time to get ACK
-back from RELP server.\
+This can be a major bottleneck in high-traffic scenarios with high network latency,
+as sending each message requires full network round-trip, incl. time for message
+packet(s) to arrive to destination and time to get ACK back from RELP server.\
 So for example with network latency of 50ms, sending each message will take 100ms+,
 and if latency jumps up to 80ms, then it'll be 160ms+/message, i.e. only about 6 msgs/s.
+
+It's likely possible using batch-\* options to queue and send/retry messages
+in parallel within such batches, only returning SUCCESS on batch flush() when all
+messages from it were delivered/acked in the background, but it's not implemented here.
 
 So in any kind of highload scenario, I'd recommend looking at
 [syslog-ng OpenTelemetry transport] instead - it likely submits/acks messages in parallel,
@@ -206,9 +207,10 @@ When stopping syslog-ng with python destination like this running, it will wait
 for any blocking operations there to finish, which can take a while (up to configured
 "timeout" parameter) if network connection or send/recv operation is in progress while
 network itself is being disabled (e.g. on system shutdown).\
-Don't think it's reasonably fixable with current syslog-ng implementation
-of python destinations - use either shorter network timeout option
-or e.g. `TimeoutStopSec=5` in syslog-ng [systemd service file] as a workaround.
+That's also potentially fixable with current syslog-ng implementation (by falsely
+returning RETRY/NOT_CONNECTED statuses to it while doing blocking work in the background),
+but not done here - use either shorter network timeout option or e.g. `TimeoutStopSec=5`
+in syslog-ng [systemd service file] as a workaround.
 
 [disk-buffer()]:
   https://syslog-ng.github.io/admin-guide/070_Destinations/200_Python/000_Python_destination_options#disk-buffer
