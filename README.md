@@ -9,10 +9,8 @@ fully implemented in an embedded `python { ... }` block/class there.
 [RELP] is a simple and efficient protocol for sending logs over network,
 with acknowledgements from the receiving side to avoid loosing any of them.
 Protocol was developed for [rsyslog] daemon, and can be useful to interoperate with it.
-
-syslog-ng does not have built-in RELP implementation at the moment (as of 2026-08-16,
-see [syslog-ng github issue-4312]), but there is also another separate-binary [Go]
-tool to do this - [cybericius/syslog-ng-relp] (runs via `program()` destination).
+syslog-ng does not have built-in RELP destination at the moment
+(as of 4.11.0 and 2026-08-16, see [syslog-ng github issue-4312]).
 
 This implementation currently only has RELP client (protocol version 1)
 for sending logs to remote RELP server, but I'll probably need server-side
@@ -98,7 +96,7 @@ Such block configures where logs will be sent to, as well as any extra parameter
   (connection, sending/receiving bytes, etc), to wait before considering
   that connection dead/broken and reconnecting.
 
-- `nak-max` (default = 4) - max attempts to send syslog message if RELP
+- `nak-max` (default = 3) - max attempts to send syslog message if RELP
   server on the other end replies with error response instead of acknowledgement
   (in case it might be temporary server-side load/storage problem), before reconnecting.
   Delay between retries is up to syslog-ng (destination returns RETRY code to it),
@@ -231,9 +229,6 @@ in syslog-ng [systemd service file] as a workaround.
 
 - [librelp] - original C library implementing RELP protocol, written for [rsyslog].
 
-- [cybericius/syslog-ng-relp] - different third-party syslog-ng RELP implementation in Go,
-  to run as separate binary via program() destination pipe.
-
 - [syslog-ng github issue-4312] - "Add a reliable transport mode (eg the syslog-ng
   PE ALTP, or rsyslog RELP)" - where progress on built-in RELP implementation can
   be tracked/reported, if any.
@@ -241,6 +236,15 @@ in syslog-ng [systemd service file] as a workaround.
 - [syslog-ng OpenTelemetry transport] - [OLTP protocol] can be used as a built-in
   and more performant alternative to RELP, as well as maybe other protocols supported
   in non-OSE syslog-ng releases.
+
+- [cybericius/syslog-ng-relp] - different third-party syslog-ng RELP implementation in [Go],
+  to run as separate binary via program() destination pipe.
+
+    Looks vibecoded and fundamentally broken, in that it doesn't confirm delivery to
+    syslog-ng itself, so if e.g. network or RELP destination isn't working right,
+    or syslog-ng is stopped/restarted, any messages in-flight, in socket and program()'s stdin
+    pipe buffers will be lost (typically 64 KiB - check `echo | pipesz --get` on a specific system).
+    Should work same as using TCP syslog socket (or likely worse, as socket will block earlier).
 
 [Reliable Event Logging Protocol spec]: https://github.com/rsyslog/librelp/blob/master/doc/relp.html
 [librelp github repo]: https://github.com/rsyslog/librelp/
