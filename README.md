@@ -9,38 +9,36 @@ fully implemented in an embedded `python { ... }` block/class there.
 [RELP] is a simple and efficient protocol for sending logs over network,
 with acknowledgements from the receiving side to avoid loosing any of them.
 Protocol was developed for [rsyslog] daemon, and can be useful to interoperate with it.
-syslog-ng does not have built-in RELP destination at the moment
-(as of 4.11.0 and 2026-08-16, see [syslog-ng github issue-4312]).
 
 This implementation currently only has RELP client (protocol version 1)
-for sending logs to remote RELP server, but I'll probably need server-side
+for sending logs to remote server, but I'll probably need server-side
 too eventually, so will likely add that later here as well.\
 It does not support TLS wrapping, intended to only run over [WireGuard tunnels],
 other similar [SD-WAN] layers, or physical local networks/segments
 (and I'd recommend to avoid app-level security mechanisms like TLS
 wrappers in general - if possible - for many good time-proven reasons,
-use network-level secure tunnels/vlans/proxies instead).
+use network-level secure tunnels/vlans/proxies instead).\
+Code easily fits into syslog-ng.conf file, does not have any extra dependencies.
 
 My use-case for this is gradually replacing rsyslog with syslog-ng,
 while keeping remote logging mechanisms working between the two,
-using python RELP destination alongside python filtering/processing code.\
-syslog-ng has [OLTP] protocol which can work in a similar way to RELP,
-but with way more complicated [gRPC]/HTTP2-based internals,
-which I'd rather avoid for complexity/overhead reasons in my setups.
+using python RELP destination alongside python filtering/processing code.
 
-Code easily fits into syslog-ng.conf file, does not have any extra dependencies.
+syslog-ng (OSE) does not have built-in RELP destination at the moment
+(as of 4.11.0 and 2026-08-16, see [syslog-ng github issue-4312]),
+but has [OTLP] protocol support, which can work in a similar way to RELP,
+except with way more complicated [gRPC]/HTTP2-based internals,
+which I'd rather avoid for complexity/overhead reasons in my setups.
 
 [syslog-ng]: https://syslog-ng.github.io/
 [Reliable Event Logging Protocol (RELP)]:
   https://en.wikipedia.org/wiki/Reliable_Event_Logging_Protocol
 [RELP]: https://en.wikipedia.org/wiki/Reliable_Event_Logging_Protocol
 [rsyslog]: https://www.rsyslog.com/
-[syslog-ng github issue-4312]: https://github.com/syslog-ng/syslog-ng/issues/4312
-[Go]: https://go.dev/
-[cybericius/syslog-ng-relp]: https://github.com/cybericius/syslog-ng-relp
 [WireGuard tunnels]: https://www.wireguard.com/
 [SD-WAN]: https://en.wikipedia.org/wiki/SD-WAN
-[OLTP]: https://opentelemetry.io/docs/specs/otlp/
+[syslog-ng github issue-4312]: https://github.com/syslog-ng/syslog-ng/issues/4312
+[OTLP]: https://opentelemetry.io/docs/specs/otlp/
 [gRPC]: https://en.wikipedia.org/wiki/GRPC
 
 Sections below:
@@ -186,15 +184,15 @@ otherwise RETRY on nak, or ERROR/NOT_CONNECTED for network issues.
 RELP messages are NOT batched or sent in parallel to each other (setting batch-\*
 options will do nothing), as implementation here is simple and synchronous.
 
+> It's likely possible using batch-\* options to queue and send/retry messages
+> in parallel within such batches, only returning SUCCESS on batch flush() when all
+> messages from it were delivered/acked in the background, but again, not implemented here.
+
 This can be a major bottleneck in high-traffic scenarios with high network latency,
 as sending each message requires full network round-trip, incl. time for message
 packet(s) to arrive to destination and time to get ACK back from RELP server.\
 So for example with network latency of 50ms, sending each message will take 100ms+,
 and if latency jumps up to 80ms, then it'll be 160ms+/message, i.e. only about 6 msgs/s.
-
-It's likely possible using batch-\* options to queue and send/retry messages
-in parallel within such batches, only returning SUCCESS on batch flush() when all
-messages from it were delivered/acked in the background, but it's not implemented here.
 
 So in any kind of highload scenario, I'd recommend looking at
 [syslog-ng OpenTelemetry transport] instead - it likely submits/acks messages in parallel,
@@ -233,7 +231,7 @@ in syslog-ng [systemd service file] as a workaround.
   PE ALTP, or rsyslog RELP)" - where progress on built-in RELP implementation can
   be tracked/reported, if any.
 
-- [syslog-ng OpenTelemetry transport] - [OLTP protocol] can be used as a built-in
+- [syslog-ng OpenTelemetry transport] - [OTLP protocol] can be used as a built-in
   and more performant alternative to RELP, as well as maybe other protocols supported
   in non-OSE syslog-ng releases.
 
@@ -249,4 +247,6 @@ in syslog-ng [systemd service file] as a workaround.
 [Reliable Event Logging Protocol spec]: https://github.com/rsyslog/librelp/blob/master/doc/relp.html
 [librelp github repo]: https://github.com/rsyslog/librelp/
 [librelp]: https://www.rsyslog.com/librelp/
-[OLTP protocol]: https://opentelemetry.io/docs/specs/otlp/
+[OTLP protocol]: https://opentelemetry.io/docs/specs/otlp/
+[cybericius/syslog-ng-relp]: https://github.com/cybericius/syslog-ng-relp
+[Go]: https://go.dev/
