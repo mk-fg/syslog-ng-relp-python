@@ -26,6 +26,37 @@ def str_cut(s, max_len, repr_fmt=True, ext='... {s_len}'):
 		s = s[:max_len - len(ext_tpl)] + ext.format(s_len=s_len)
 	return s
 
+
+class TBFRateLimit(sng.LogParser):
+
+	def token_bucket_rate(self, rate, td=1, burst=1, negative_tokens=False):
+		if (rate := rate / td) == float('inf'):
+			while True: yield None
+		elif rate <= 0:
+			while True: yield 2**31 # safe "infinite delay" value
+		n, ts, d = max(0, burst - 1), time.monotonic(), (yield) or 1
+		while True:
+			n = min(burst, n - rate * (ts - (ts := time.monotonic())))
+			if n >= d: n, d = n - d, (yield) or 1; continue
+			n, d = (n - d if negative_tokens else n), (yield (d - n) / rate) or 1
+
+	def init(self, opts):
+		n, td, burst = map(int, ( opts.get(k, 1)
+			for k in 'tokens_ _within_seconds _with_burst'.split() ))
+		self.tbf_warned, self.tbf_repr = False, (f'{n:,d}t' + ( '/s'
+			if td == 1 else f'/{td:,d}s' ) + f' [burst={burst:,d}]'*(burst!=1))
+		self.tbf = self.token_bucket_rate(n, td, burst)
+		return True
+
+	def parse(self, msg):
+		if not (td := next(self.tbf)): self.tbf_warned = False
+		else:
+			if self.tbf_warned: return
+			msg['MESSAGE'] = f'[ sng-rate-limit {self.tbf_repr} active for {td:,.1f}s ]'
+			self.tbf_warned = True # will suppress future warnings
+		return True
+
+
 class RELPDestination(sng.LogDestination):
 	# syslog-ng needs e.g. TimeoutStopSec=5 with this,
 	#  as otherwise it can hang on some blocking call here during shutdown.
