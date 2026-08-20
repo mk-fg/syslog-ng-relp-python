@@ -63,16 +63,14 @@ Grab [syslog-ng.relp-client.conf] file from the repository, and edit
 
 ```
 destination d_relp { python(
-  # Supported options(): ipv4 ipv6 port timeout nak-max
-  #  reconn-min reconn-max reconn-factor stderr-prefix debug
   class('RELPDestination') options(
     'ipv4' => '127.0.0.1'
     'port' => '11122'
-    'debug' => 'y' )
+    'log' => 'debug' )
   # disk-buffer(
-  #   flow-control-window-bytes(200000) # should be sized to fit logs for couple reconnect attempts
+  #   flow-control-window-bytes(200000)
   #   capacity-bytes(2000000) reliable(yes) dir('/var/spool/sng/queue') )
-  time-reopen(20) ); }; # time-reopen() is only used when source is idle, otherwise reopens on every line
+  time-reopen(20) ); };
 ```
 
 [syslog-ng.relp-client.conf]: syslog-ng.relp-client.conf
@@ -109,7 +107,9 @@ Such block configures where logs will be sent to, as well as any extra parameter
   syslog-ng's stderr stream. Normally there should only be output on network/protocol errors,
   excluding repeated connection attempts.
 
-- `debug` (yes/no, default = disabled) - enables additional logging for all connection attempts.
+- `log` (quiet/error/info/debug, default = info) - enables extra logging for (re-)connection attempts.
+  "info" (default) is same as "error", except logs where/when first connection is established,
+  to e.g. confirm that configuration worked after restart.
 
 Note that RELP code logs to stderr stream directly, instead of using syslog-ng's
 [internal() logging source], as I found latter to be delayed, as well as more
@@ -117,10 +117,15 @@ difficult and error-prone to configure correctly.\
 Replace `pr_debug` and `pr_err` calls to `print()` at the top of python code block
 with `sng.Logger()` debug/error methods to use that internal-logger instead.
 
+Make sure to also enable/confiure [disk-buffer()] for message delivery to be actually reliable,
+as messages have to be stored/buffered somewhere on any kind of network/destination problems.
+
 [options()]:
   https://syslog-ng.github.io/admin-guide/070_Destinations/200_Python/000_Python_destination_options#options
 [internal() logging source]:
   https://syslog-ng.github.io/admin-guide/060_Sources/010_Internal/README
+[disk-buffer()]:
+  https://syslog-ng.github.io/admin-guide/070_Destinations/200_Python/000_Python_destination_options#disk-buffer
 
 
 <a name=hdr-test_run></a>
@@ -208,8 +213,6 @@ returning RETRY/NOT_CONNECTED statuses to it while doing blocking work in the ba
 but not done here - use either shorter network timeout option or e.g. `TimeoutStopSec=5`
 in syslog-ng [systemd service file] as a workaround.
 
-[disk-buffer()]:
-  https://syslog-ng.github.io/admin-guide/070_Destinations/200_Python/000_Python_destination_options#disk-buffer
 [syslog-ng OpenTelemetry transport]:
   https://syslog-ng.github.io/admin-guide/070_Destinations/157_OpenTelemetry/README
 [workers() option]:
