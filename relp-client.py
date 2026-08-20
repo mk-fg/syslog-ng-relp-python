@@ -1,22 +1,5 @@
-## syslog-ng -F -f syslog-ng.relp-client.conf --persist-file /tmp/relp.client.state
-
-@version: 4.11
-
-options {
-	use-dns(no);
-	dns-cache(no);
-	flush-lines(100);
-	log-fifo-size(10000);
-	on-error(drop-message);
-	stats( freq(0) level(0) );
-	mark-freq(0);
-	mark-mode(none);
-	ts-format(iso);
-	frac-digits(6);
-};
-
-
-python {
+## Can be either included or embedded into syslog-ng.conf via `python { ... }` block
+## Code here should be exactly same as inside syslog-ng.relp-client.conf next to it
 
 import os, sys, socket, select, time, enum, syslogng as sng
 
@@ -211,38 +194,3 @@ class RELPDestination(sng.LogDestination):
 
 	def is_opened(self): return bool(self.sock)
 	def deinit(self): self.close()
-
-};
-
-
-## Direct syslog-ng's internal logging to systemd-journal via stdout stream
-# This will normally also end up in RELP remote logging with systemd-journal() source,
-#  but also allow to see any problems via local journalctl command, e.g. if RELP isn't working.
-
-template t_journal { template("$MSG\n"); }; # without timestamps for systemd journal
-source s_sng { internal(); };
-destination d_stdout { stdout( mark-freq(5) mark-mode(periodical) template(t_journal) ); };
-filter f_sng { level(warning..emerg); };
-log { source(s_sng); filter(f_sng); destination(d_stdout); flags(final); };
-
-
-## stdin source for testing with a bash loop or some generator tool like flog
-source s_syslog { stdin( program-override('stdin') use-syslogng-pid(yes) flags(no-parse) ); };
-
-## Proper systemd-journal source, commonly used on modern linux
-## If read-old-records and such are enabled, disk-buffer might need to be large to fit them all
-# source s_syslog { systemd-journal( read-old-on-error(no) ); };
-
-destination d_relp { python(
-	# Supported options(): ipv4 ipv6 port timeout nak-max
-	#  reconn-min reconn-max reconn-factor stderr-prefix log (quiet error info debug)
-	class('RELPDestination') options(
-		'ipv4' => '127.0.0.1'
-		'port' => '11122'
-		'log' => 'debug' )
-	# disk-buffer(
-	# 	flow-control-window-bytes(200000) # should be sized to fit logs for couple reconnect attempts
-	# 	capacity-bytes(20000000) reliable(yes) dir('/var/spool/sng/queue') )
-	time-reopen(20) ); }; # time-reopen() is only used when source is idle, otherwise reopens on every line
-
-log { source(s_syslog); destination(d_relp); flags(final); };

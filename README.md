@@ -118,7 +118,8 @@ Replace `pr_debug` and `pr_err` calls to `print()` at the top of python code blo
 with `sng.Logger()` debug/error methods to use that internal-logger instead.
 
 Make sure to also enable/confiure [disk-buffer()] for message delivery to be actually reliable,
-as messages have to be stored/buffered somewhere on any kind of network/destination problems.
+as messages have to be stored/buffered somewhere during any kind of network/destination problems,
+system or syslog-ng daemon restarts.
 
 [options()]:
   https://syslog-ng.github.io/admin-guide/070_Destinations/200_Python/000_Python_destination_options#options
