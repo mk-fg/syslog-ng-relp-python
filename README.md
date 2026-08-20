@@ -59,17 +59,13 @@ This repository URLs:
 ## How to use
 
 Grab [syslog-ng.relp-client.conf] file from the repository, and edit
-["destination" block] at the bottom, that looks like this:
+["destination" block] at the bottom, that looks something like this:
 
 ```
 destination d_relp { python(
-  class('RELPDestination') options(
-    'ipv4' => '127.0.0.1'
-    'port' => '11122'
-    'log' => 'debug' )
-  # disk-buffer(
-  #   flow-control-window-bytes(200000)
-  #   capacity-bytes(2000000) reliable(yes) dir('/var/spool/sng/queue') )
+  class(RELPDestination) options(ipv4 => 127.0.0.1, port => 11122)
+  disk-buffer( capacity-bytes(2000000) reliable(yes)
+    flow-control-window-bytes(200000) dir('/var/spool/sng/queue') )
   time-reopen(20) ); };
 ```
 
