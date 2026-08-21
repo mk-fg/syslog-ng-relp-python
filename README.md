@@ -103,13 +103,13 @@ Such block configures where logs will be sent to, as well as any extra parameter
   syslog-ng's stderr stream. Normally there should only be output on network/protocol errors,
   excluding repeated connection attempts.
 
-- `log` (quiet/error/info/debug, default = info) - enables extra logging for (re-)connection attempts.
-  "info" (default) is same as "error", except logs where/when first connection is established,
-  to e.g. confirm that configuration worked after restart.
+- `stderr-level` (quiet/error/info/debug, default = info) - enables extra logging for
+  RELP (re-)connection attempts. "info" (default) is same as "error", except logs where/when
+  first connection is established, to e.g. confirm that configuration worked after restart.
 
-Note that RELP code logs to stderr stream directly, instead of using syslog-ng's
-[internal() logging source], as I found latter to be delayed, as well as more
-difficult and error-prone to configure correctly.\
+Note that RELP code logs to stderr stream directly (for [systemd-journal] or e.g. [logger] to catch),
+instead of using syslog-ng's [internal() logging source], as I found latter to be delayed,
+as well as more difficult and error-prone to configure correctly.\
 Replace `pr_debug` and `pr_err` calls to `print()` at the top of python code block
 with `sng.Logger()` debug/error methods to use that internal-logger instead.
 
@@ -119,6 +119,8 @@ system or syslog-ng daemon restarts.
 
 [options()]:
   https://syslog-ng.github.io/admin-guide/070_Destinations/200_Python/000_Python_destination_options#options
+[systemd-journal]: https://man.archlinux.org/man/core/systemd/systemd-journald.8.en
+[logger]: https://man.archlinux.org/man/logger.1
 [internal() logging source]:
   https://syslog-ng.github.io/admin-guide/060_Sources/010_Internal/README
 [disk-buffer()]:

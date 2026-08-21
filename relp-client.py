@@ -58,9 +58,10 @@ class RELPDestination(sng.LogDestination):
 	# syslog-ng needs e.g. TimeoutStopSec=5 with this,
 	#  as otherwise it can hang on some blocking call here during shutdown.
 
-	opts_default = dict( ipv4='', ipv6='', port=0,
-		timeout=151, nak_max=3, stderr_prefix='RELP: ',
-		reconn_min=5, reconn_max=3600, reconn_factor=1.3, log='info' )
+	opts_default = dict(
+		ipv4='', ipv6='', port=0, timeout=151, nak_max=3,
+		reconn_min=5, reconn_max=3600, reconn_factor=1.3,
+		stderr_prefix='RELP: ', stderr_level='info' )
 
 	def init(self, opts):
 		opts = adict(self.opts_default, **dict((k.replace(*'-_'), v) for k, v in opts.items()))
@@ -71,13 +72,17 @@ class RELPDestination(sng.LogDestination):
 		self.sock_timeout, self.nak_max = float(opts.timeout), int(opts.nak_max)
 		self.reconn = adict( ts=0, fails=0, td_warn=True,
 			k=float(opts.reconn_factor), min=float(opts.reconn_min), max=float(opts.reconn_max) )
-		try: log = enum.IntEnum('log', ll := 'quiet error info debug')[log := opts.log.strip().lower()]
-		except KeyError: raise ValueError(f'"log" option value [ {log!r} ] must be one of: {ll}')
+		try: log = enum.IntEnum( 'log', log_levels :=
+			'quiet error info debug' )[log := opts.stderr_level.strip().lower()]
+		except KeyError: raise ValueError(
+			f'"stderr-level" option value [ {log!r} ] must be one of: {log_levels}' )
 		log_null = lambda msg: None
 		log_pre = ( lambda f,_pre=opts.stderr_prefix:
 			log_null if log is log.quiet else (lambda msg: f(f'{_pre}{msg}')) )
 		self.log_err, self.log_debug = (
 			log_pre(pr_err), log_pre(pr_debug) if log is log.debug else log_null )
+		if opts_extra := ' '.join(set(opts.keys()).difference(self.opts_default)):
+			self.log_err(f'Unused/unrecognized configuration option(s): {opts_extra}')
 		self.log_init = log_null if log > log.info else self.log_err
 		self.log_init(f'initialized with {self.ep} destination')
 		return True
