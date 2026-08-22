@@ -57,6 +57,7 @@ class TBFRateLimit(sng.LogParser):
 class RELPDestination(sng.LogDestination):
 	# syslog-ng needs e.g. TimeoutStopSec=5 with this,
 	#  as otherwise it can hang on some blocking call here during shutdown.
+	log_init = True # global to be tracked on reinit with SIGHUP
 
 	opts_default = dict(
 		ipv4='', ipv6='', port=0, timeout=151, nak_max=3,
@@ -83,8 +84,10 @@ class RELPDestination(sng.LogDestination):
 			log_pre(pr_err), log_pre(pr_debug) if log is log.debug else log_null )
 		if opts_extra := ' '.join(set(opts.keys()).difference(self.opts_default)):
 			self.log_err(f'Unused/unrecognized configuration option(s): {opts_extra}')
-		self.log_init = log_null if log > log.info else self.log_err
-		self.log_init(f'initialized with {self.ep} destination')
+		if self.log_init:
+			RELPDestination.log_init = False
+			self.log_init = log_null if log > log.info else self.log_err
+			self.log_init(f'initialized with {self.ep} destination')
 		return True
 
 	def reconn_check(self):
